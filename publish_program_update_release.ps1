@@ -3,10 +3,11 @@ param(
     [string]$BaseUrl = "https://kazpar.pl/opengd77-updater",
     [string]$ServerHost = "kazpar.pl",
     [int]$Port = 1024,
-    [string]$User = "root",
+    [string]$User = "kazek",
     [string]$SshKeyPath = "C:\\Users\\Kazek\\.ssh\\kazek_server",
     [string]$RemoteDir = "/home/kazek/www/opengd77-updater",
-    [switch]$UpdateLocalConfig
+    [switch]$UpdateLocalConfig,
+    [switch]$AllowRoot
 )
 
 $ErrorActionPreference = "Stop"
@@ -18,6 +19,9 @@ if (-not (Test-Path $buildScript)) {
 }
 if (-not (Test-Path $SshKeyPath)) {
     throw ("Brak klucza SSH: " + $SshKeyPath)
+}
+if ($User -eq "root" -and -not $AllowRoot) {
+    throw "Publikacja na root jest zablokowana. Uzyj konta deploy/kazek lub podaj -AllowRoot."
 }
 
 Write-Host "[1/5] Build paczki update..." -ForegroundColor Cyan
