@@ -1,0 +1,6 @@
+{
+    "app_version":  "2026.03.01.7",
+    "manifest_url":  "https://kazpar.pl/opengd77-updater/latest.json",
+    "auto_check_on_start":  true,
+    "ui_language":  "pl"
+}
