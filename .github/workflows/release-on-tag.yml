@@ -1,0 +1,84 @@
+name: release-on-tag
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Resolve version
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+          if ([string]::IsNullOrWhiteSpace($version)) {
+            throw "Nieprawidlowy tag: ${{ github.ref_name }}"
+          }
+          "APP_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Install build dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller==6.11.1 pyserial==3.5 pyusb==1.2.1
+
+      - name: Build backend CLI
+        shell: pwsh
+        run: |
+          pyinstaller --noconfirm OpenGD77_UV390_BackendCLI.spec
+          if (!(Test-Path "dist/OpenGD77_UV390_BackendCLI.exe")) {
+            throw "Brak pliku dist/OpenGD77_UV390_BackendCLI.exe"
+          }
+
+      - name: Build updater package
+        shell: pwsh
+        run: |
+          $baseUrl = "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}"
+          ./build_program_update_release.ps1 -Version $env:APP_VERSION -BaseUrl $baseUrl
+
+          $releaseDir = "dist/program_updater_release/$env:APP_VERSION"
+          $packagePath = "$releaseDir/OpenGD77_UV390_A11y_$env:APP_VERSION.zip"
+          $manifestPath = "$releaseDir/latest.json"
+
+          if (!(Test-Path $packagePath)) {
+            throw "Brak paczki: $packagePath"
+          }
+          if (!(Test-Path $manifestPath)) {
+            throw "Brak manifestu: $manifestPath"
+          }
+
+          "PACKAGE_PATH=$packagePath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "MANIFEST_PATH=$manifestPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Generate checksum
+        shell: pwsh
+        run: |
+          $checksumPath = "dist/program_updater_release/$env:APP_VERSION/OpenGD77_UV390_A11y_$env:APP_VERSION.sha256"
+          $hash = (Get-FileHash -Path $env:PACKAGE_PATH -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  OpenGD77_UV390_A11y_$env:APP_VERSION.zip" | Out-File -FilePath $checksumPath -Encoding ascii -NoNewline
+          "CHECKSUM_PATH=$checksumPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: OpenGD77 UV390 Updater ${{ env.APP_VERSION }}
+          generate_release_notes: true
+          files: |
+            ${{ env.PACKAGE_PATH }}
+            ${{ env.MANIFEST_PATH }}
+            ${{ env.CHECKSUM_PATH }}
