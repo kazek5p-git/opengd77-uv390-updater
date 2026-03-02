@@ -30,6 +30,14 @@ jobs:
           }
           "APP_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
+          if ($version -match '(?i)(?:^|[.-])(rc|beta|alpha)[0-9]*$') {
+            "RELEASE_PRERELEASE=true" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            "RELEASE_MAKE_LATEST=false" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          } else {
+            "RELEASE_PRERELEASE=false" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            "RELEASE_MAKE_LATEST=true" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          }
+
       - name: Install build dependencies
         shell: pwsh
         run: |
@@ -78,6 +86,8 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: OpenGD77 UV390 Updater ${{ env.APP_VERSION }}
           generate_release_notes: true
+          prerelease: ${{ env.RELEASE_PRERELEASE }}
+          make_latest: ${{ env.RELEASE_MAKE_LATEST }}
           files: |
             ${{ env.PACKAGE_PATH }}
             ${{ env.MANIFEST_PATH }}
